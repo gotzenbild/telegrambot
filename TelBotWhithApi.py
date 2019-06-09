@@ -5,7 +5,7 @@ import time
 import threading
 import requests
 
-TOKEN = ""
+TOKEN = ''
 bot = telebot.TeleBot(TOKEN)
 RusArr= {1:2, 2:3, 3:4 , 4:5 , 5:6 ,6:7, 7:1}
 today = datetime.datetime.today().weekday()
