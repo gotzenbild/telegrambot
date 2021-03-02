@@ -9,19 +9,19 @@ TOKEN = ''
 bot = telebot.TeleBot(TOKEN)
 RusArr= {1:2, 2:3, 3:4 , 4:5 , 5:6 ,6:7, 7:1}
 today = datetime.datetime.today().weekday()
-
+database_name = 'scheduledb.db'
 
 def user_chat_id_try(message):
-    conn = sqlite3.connect('scheduledb.db')
+    conn = sqlite3.connect(database_name)
     cursor = conn.cursor()
     user_chat_id = message.chat.id
 
     chat_id_try = cursor.execute("SELECT * FROM `users` WHERE user_chat_id =(?)", (user_chat_id,)).fetchone()
-    if chat_id_try == None:
+    if chat_id_try is None:
         cursor.execute("INSERT INTO users (user_chat_id,username) VALUES ('%s','%s')" % (user_chat_id, message.chat.username))
 
     notification_try = cursor.execute("SELECT * FROM `notification` WHERE user_chat_id =(?)", (user_chat_id,)).fetchone()
-    if notification_try == None:
+    if notification_try is None:
         cursor.execute("INSERT INTO notification (user_chat_id) VALUES ('%s')" % (user_chat_id,))
 
     conn.commit()
@@ -34,14 +34,14 @@ def user_chat_id_try(message):
 # Ф-я авто-уведомлений
 
 def timeCheck ():
-    conn = sqlite3.connect('scheduledb.db')
+    conn = sqlite3.connect(database_name)
     cursor = conn.cursor()
     while True:
         currtime = datetime.time( datetime.datetime.now().time().hour,  datetime.datetime.now().time().minute)
         user_chat_ids =  cursor.execute('SELECT user_chat_id FROM `notification` WHERE time_n=(?)',(str(currtime),))
         user_chat_ids = user_chat_ids.fetchall()
         for user_chat_id in user_chat_ids :
-                if user_chat_id != None and user_chat_id != '':
+                if user_chat_id is not None and user_chat_id != '':
                     txt = showDay(RusArr[today+1], user_chat_id)
                     bot.send_message(user_chat_id, '<b>Авто-нагадування</b>\n\n' +txt, parse_mode="HTML")
         time.sleep(60)
@@ -55,14 +55,15 @@ tChThr.start()
 # # # Ф-я для вывода пар на определенный день
 
 
-def showDay(day, user_chat_id) :
-    if day >6 :
+def showDay(day, user_chat_id):
+    if day > 6:
         day=1
-    conn = sqlite3.connect('scheduledb.db')
+    conn = sqlite3.connect(database_name)
     cursor = conn.cursor()
-    user_group = ((cursor.execute("SELECT user_group  FROM `users` WHERE user_chat_id =(?)", (user_chat_id,))).fetchone())[0]
+    user_group = ((cursor.execute("SELECT user_group  FROM `users` WHERE user_chat_id =(?)",
+                                  (user_chat_id,))).fetchone())[0]
     user_group_lessons = requests.get('https://api.rozklad.org.ua/v2/groups/{0}/timetable'.format(user_group)).json()
-    if (user_group_lessons["statusCode"] == 200):
+    if user_group_lessons["statusCode"] == 200:
         week = requests.get('http://api.rozklad.org.ua/v2/weeks').json()
         lessons_day = user_group_lessons["data"]["weeks"][str(week['data'])]["days"][str(day)]
         text_for_send = "<b> - {0} - </b>\n".format(lessons_day["day_name"])
@@ -84,19 +85,19 @@ def showDay(day, user_chat_id) :
 @bot.message_handler(commands=['monday','tuesday','wednesday','thursday','friday','saturday'])
 def handle_monday(message):
     user_chat_id = user_chat_id_try(message)
-    dictOfDays = {'monday':1,'tuesday':2 ,'wednesday':3,'thursday':4,'friday':5 ,'saturday':6 }
-    bot.send_message(message.chat.id, showDay(dictOfDays[message.text[1:]], user_chat_id), parse_mode="HTML")
+    dict_of_days = {'monday':1,'tuesday':2 ,'wednesday':3,'thursday':4,'friday':5 ,'saturday':6 }
+    bot.send_message(message.chat.id, showDay(dict_of_days[message.text[1:]], user_chat_id), parse_mode="HTML")
 
 # # # ф-я позволяет принимает команду отсылает рассписание на неделю (в командной форме)
 @bot.message_handler(commands=['all'])
 def handle_all(message):
     user_chat_id = user_chat_id_try(message)
-    conn = sqlite3.connect('scheduledb.db')
+    conn = sqlite3.connect(database_name)
     cursor = conn.cursor()
     user_group = ((cursor.execute("SELECT user_group  FROM `users` WHERE user_chat_id =(?)", (user_chat_id,))).fetchone())[0]
     user_group_lessons = requests.get('https://api.rozklad.org.ua/v2/groups/{0}/timetable'.format(user_group))
     user_group_lessons = user_group_lessons.json()
-    if( user_group_lessons['statusCode'] == 200):
+    if user_group_lessons['statusCode'] == 200:
         for week in range(1,3):
             text = '<b>Розклад групи - {0} -</b>\n\n'.format(user_group_lessons['data']['group']['group_full_name'], )
             text +='<b>Неділя - {0}</b>'.format(week) +'\n'
@@ -126,14 +127,14 @@ def handle_all(message):
 @bot.message_handler(commands=['today'])
 def handle_all(message):
     user_chat_id  = user_chat_id_try(message)
-    text =showDay(RusArr[today] , user_chat_id )
-    bot.send_message(user_chat_id ,text, parse_mode= "HTML")
+    text =showDay(RusArr[today], user_chat_id )
+    bot.send_message(user_chat_id, text, parse_mode= "HTML")
 #
 # # # ф-я позволяет принимает команду отсылает рассписание завтра (в командной форме)
 @bot.message_handler(commands=['tomorrow'])
 def handle_all(message):
     user_chat_id = user_chat_id_try(message)
-    text =showDay(RusArr[today+1] ,  user_chat_id)
+    text =showDay(RusArr[today+1],  user_chat_id)
     bot.send_message( user_chat_id,text, parse_mode= "HTML")
 #
 # # # ф-я позволяет установить время автоуведомлений   (в командной форме)
@@ -197,7 +198,7 @@ def handle_start(message):
 
     user_inf = cursor.execute("SELECT *  FROM `users` WHERE user_chat_id =(?)",(user_chat_id,))
     group_id = user_inf.fetchone()[2]
-    if group_id == None or group_id=='' :
+    if group_id is None or group_id == '' :
         group_name = 'Група не обрана'
     else :
         group_inf = requests.get('http://api.rozklad.org.ua/v2/groups/{0}'.format(group_id))
@@ -219,9 +220,9 @@ def handle_start(message):
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
     user_chat_id = user_chat_id_try(message)
-    RusArr= {'Понеділок':1, 'Вівторок': 2, 'Середа':3 ,'Четвер': 4, 'П\'ятниця' :5, 'Субота':6}
-    if (message.text in RusArr.keys()) :
-        bot.send_message(user_chat_id, showDay(RusArr[message.text], user_chat_id), parse_mode="HTML")
+    rus_arr= {'Понеділок':1, 'Вівторок': 2, 'Середа':3 ,'Четвер': 4, 'П\'ятниця' :5, 'Субота':6}
+    if message.text in rus_arr.keys():
+        bot.send_message(user_chat_id, showDay(rus_arr[message.text], user_chat_id), parse_mode="HTML")
     else:
         bot.send_message(user_chat_id, 'Я не знаю що означає <code> "{0}" </code>'.format(message.text, ),parse_mode="HTML")
 
